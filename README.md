@@ -32,7 +32,6 @@ Each line represents a word , the word and its id is separated by a comma
 
 **example**:
 > apple,0
-banana,1
 
 ## Parameter Explanation
 
