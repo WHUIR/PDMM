@@ -29,13 +29,13 @@ Anonther file you should prepare is the `word similarity` file. In our paper, we
 
 `beta`: the hyper-parameter beta, and the alpha is calculated as 50/numTopic
 
-'namda': the hyper-parameter for Poisson distribution
+`namda`: the hyper-parameter for Poisson distribution
 
-'maxTd': the max number of topics in a document
+`maxTd`: the max number of topics in a document
 
-'searchTopk' : the search size of heuristic pruning strategy
+`searchTopk` : the search size of heuristic pruning strategy
 
-'initialFileName' : the file of model's initlization 
+`initialFileName` : the file of model's initlization 
 
 `similarityFileName`: the file of words' similarity
 
