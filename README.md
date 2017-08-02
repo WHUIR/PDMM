@@ -28,10 +28,11 @@ Anonther file you should prepare is the `word similarity` file. In our paper, we
 You also need to provide word2id file for launching the program, the data format is described as follows:
 > word,id
 
-Each line represents a word , the word and its id is separated by **,**
+Each line represents a word , the word and its id is separated by a comma
 
 **example**:
 > apple,0
+banana,1
 
 ## Parameter Explanation
 
