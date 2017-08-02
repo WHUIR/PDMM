@@ -25,6 +25,12 @@ The data format is described as follows:
 ***
 Anonther file you should prepare is the `word similarity` file. In our paper, we use the [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity) calculated on [word embeddings](https://code.google.com/archive/p/word2vec/). This can be prepared in advance.
 
+You also need to provide word2id file for launching the program, the data format is described as follows:
+> word,id
+
+**example**:
+> apple,0
+
 ## Parameter Explanation
 
 `beta`: the hyper-parameter beta, and the alpha is calculated as 50/numTopic
