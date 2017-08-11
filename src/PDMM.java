@@ -23,10 +23,6 @@ import javax.jws.soap.SOAPBinding.Use;
 
 import java.util.Map.Entry;
 
-/**
- * @author Li Chenliang [lich0020@ntu.edu.sg]
- *
- */
 public class PDMM {
 	
 	public Set<String> wordSet;
@@ -1022,7 +1018,7 @@ public class PDMM {
 	}
 
 	private Boolean saveAssign(String filename) {
-		// TODO ×Ô¶¯Éú³ÉµÄ·½·¨´æ¸ù
+		// TODO è‡ªåŠ¨ç”Ÿæˆçš„æ–¹æ³•å­˜æ ¹
 		try {
 			PrintWriter out = new PrintWriter(filename);
 			for (int i = 0; i < numDoc; i++) {
@@ -1044,7 +1040,7 @@ public class PDMM {
 	}
 	
 	private Boolean saveTermAssign(String filename) {
-		// TODO ×Ô¶¯Éú³ÉµÄ·½·¨´æ¸ù
+		// TODO è‡ªåŠ¨ç”Ÿæˆçš„æ–¹æ³•å­˜æ ¹
 		try {
 			PrintWriter out = new PrintWriter(filename);
 			for (int i = 0; i < numDoc; i++) {
