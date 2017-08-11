@@ -1,4 +1,4 @@
-package PDMM_GPU_LCL;
+package PDMM;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
@@ -48,9 +48,9 @@ public class Document {
 	  }
 
   public static void main(String[] args) {
-    // TODO ×Ô¶¯Éú³ÉµÄ·½·¨´æ¸ù
-    String [] sarray = {"¿Æ¼¼","×¨¿Æ","Î÷°²","´óÑ§"};
-    Document doc = new Document(1, "ÔºĞ£ĞÅÏ¢", sarray);
+    // TODO è‡ªåŠ¨ç”Ÿæˆçš„æ–¹æ³•å­˜æ ¹
+    String [] sarray = {"ç§‘æŠ€","ä¸“ç§‘","è¥¿å®‰","å¤§å­¦"};
+    Document doc = new Document(1, "é™¢æ ¡ä¿¡æ¯", sarray);
     System.out.println(doc.id);
   }
 }
