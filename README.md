@@ -1,7 +1,7 @@
 # PDMM
-The implementation of Poisson-based Dirichlet Multinomial Mixture model (PDMM), which is already accepted by TOIS 2017 and will be published soon.
+The implementation of "Enhancing Topic Modeling for Short Texts with Auxiliary Word Embeddings", TOIS 2017
 
-The PDMM is an effective topic model for short texts.
+The model PDMM proposed in this paper is an effective topic model for short texts.
 
 The code is contributed by Yu Duan, who is a master in Wuhan University. If you want to contact him, please email to **duanyu@whu.edu.cn**
 
