@@ -54,7 +54,6 @@ public class PDMM {
 	public int maxTd; // the maximum number of topics within a document
 	private double[][] schema;
 	public Map<Integer, int[]> docToWordIDListMap;
-	public String initialFileName;  // we use the same initial for DMM-based model
 	public double[][] phi;
 	private double[] pz;
 	private double[][] pdz;
@@ -554,12 +553,6 @@ public class PDMM {
 		nzw = new double[numTopic][vocSize];
 		Ck = new int[numTopic];
 		CkSum = 0;
-	}
-
-	public void init_GSDMM_fromdmm(){
-		loadInitialStatus(initialFileName);
-		schemaMap = loadSchema(similarityFileName, threshold);
-		
 	}
 	
 	public void init_GSDMM() {
@@ -1241,44 +1234,41 @@ public class PDMM {
 
 	public static void main(String[] args) {
 		
-		ArrayList<Document> doc_list = Document.LoadCorpus("//data//qa_data.txt");
-		//here
+		ArrayList<Document> doc_list = Document.LoadCorpus("dataset//qa_data.txt");
+		//params here, please refer to our paper
 		int numIter = 200, save_step = 200;
 		double beta = 0.1;
-		String similarityFileName = "data//qa_word_similarity.txt";
+		String similarityFileName = "dataset//qa_w2v.txt";
 		double weight = 0.1;
 		double threshold = 0.7;
-		int filterSize = 40;
-	
-		int[] ls = {0,2,3,4,6,8,9,10};
+		int filterSize = 40; //note here, we make a mistake in the paper writing, we use filtersize=20 for Snippet but 40 for BaiduQA
+		//params of Poisson distribution
+	//	int[] ls = {0,2,3,4,6,8,9,10};
 		
-		for (int round = 2; round <= 3;round += 1) {
-		for (int l:ls){
-	//	for (int maxTd = 4; maxTd <= 4; maxTd +=1){
-	//		for (int num_topic = 40; num_topic <= 40; num_topic += 20) {
-				int num_topic = 40;
-				String initialFileName = "f:/PDMM/qa_assign.txt";
+		for (int round = 1; round <= 5;round += 1) {
+	//	for (int l:ls){
+	//	for (int maxTd = 1; maxTd <= 4; maxTd +=1){
+			for (int num_topic = 40; num_topic <= 40; num_topic += 20) {
+				//int num_topic = 40;
 				double alpha = 1.0 * 50 / num_topic;
-				double namda = (double)1.0+l/(double)10.0;
+				//double namda = (double)1.0+l/(double)10.0;
+				double nambda = 1.5;
+				int maxTd = 2;
+				int Topk = 10;
+				
 				PDMM gsdmm = 
 					new PDMM(doc_list, num_topic, numIter, save_step, beta, alpha, namda, threshold);
 				gsdmm.word2idFileName = "f:/qa_word2id.txt";
 				gsdmm.topWords = 100;
-				int maxTd = 2;
-				
 				gsdmm.maxTd = maxTd;
-				int Topk = 10;
 				gsdmm.searchTopK = Topk; // search size for heuristic search , 
 				                          //we don't use heuristic search if we set searchTopK = numTopic
 			//	int round = 1;
 			//	double weight = w/(double)10;
 				
-				
-				
 				//here
 				gsdmm.filterSize = filterSize;
 				gsdmm.roundIndex = round;
-				gsdmm.initialFileName = initialFileName;
 				gsdmm.similarityFileName = similarityFileName;
 				gsdmm.weight = weight;
 				gsdmm.initNewModel();
