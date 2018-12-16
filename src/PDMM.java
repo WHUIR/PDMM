@@ -20,7 +20,6 @@ import java.util.Random;
 import java.util.Set;
 
 import javax.jws.soap.SOAPBinding.Use;
-
 import java.util.Map.Entry;
 
 public class PDMM {
@@ -39,6 +38,7 @@ public class PDMM {
 	public int filterSize;
 	public String word2idFileName;
 	public String similarityFileName;
+	public boolean use_gpu;
 
 	public Map<String, Integer> word2id;
 	public Map<Integer, String> id2word;
@@ -196,65 +196,6 @@ public class PDMM {
 		}
 		return max;
 	}
-
-	/**
-	 * Get the top words under each topic given current Markov status.
-	 * not used in this RatioGPUDMM
-	 */
-	private ArrayList<ArrayList<Integer>> getTopWordsUnderEachTopicGivenCurrentMarkovStatus() {
-		compute_pz();
-		compute_phi();
-		if (topWordIDList.size() <= numTopic) {
-			for (int t = 0; t < numTopic; t++) {
-				topWordIDList.add(new ArrayList<Integer>());
-			}
-		}
-		int top_words = topWords;
-
-		for (int t = 0; t < numTopic; ++t) {
-			Comparator<Integer> comparator = new TopicalWordComparator(phi[t]);
-			PriorityQueue<Integer> pqueue = new PriorityQueue<Integer>(top_words, comparator);
-
-			for (int w = 0; w < vocSize; ++w) {
-				if (pqueue.size() < top_words) {
-					pqueue.add(w);
-				} else {
-					if (phi[t][w] > phi[t][pqueue.peek()]) {
-						pqueue.poll();
-						pqueue.add(w);
-					}
-				}
-			}
-
-			ArrayList<Integer> oneTopicTopWords = new ArrayList<Integer>();
-			while (!pqueue.isEmpty()) {
-				oneTopicTopWords.add(pqueue.poll());
-			}
-			topWordIDList.set(t, oneTopicTopWords);
-		}
-		return topWordIDList;
-	}
-
-	/**
-	 * update the p(z|w) for every iteration
-	 */
-	public void updateTopicProbabilityGivenWord() {
-		// TODO we should update pz and phi information before
-		compute_pz();
-		compute_phi();  //update p(w|z)
-		double row_sum = 0.0;
-		for (int i = 0; i < vocSize; i++) {
-			row_sum = 0.0;
-			for (int j = 0; j < numTopic; j++) {
-				topicProbabilityGivenWord[i][j] = pz[j] * phi[j][i];
-				row_sum += topicProbabilityGivenWord[i][j];
-			}
-			for (int j = 0; j < numTopic; j++) {
-				topicProbabilityGivenWord[i][j] = topicProbabilityGivenWord[i][j] / row_sum;  //This is p(z|w)
-			}
-		}
-	}
-	
 	
 	public double findTopicMaxProbabilityGivenWord(int wordID) {
 		double max = -1.0;
@@ -331,59 +272,6 @@ public class PDMM {
 		}
 	}
 
-	public void ratioCountNofilter(Integer topic, Integer docID, int word, int index, int flag) {
-		nzw[topic][word] += flag;
-		nz[topic] += flag;
-		
-		// we update gpu flag for every document before it change the counter
-		// when adding numbers
-		boolean gpuFlag = true;
-		if (flag > 0) {
-		//	updateWordGPUFlag(docID, word, index, topic);
-		//	boolean gpuFlag = wordGPUFlag.get(docID).get(index);
-			Map<Integer, Double> gpuInfo = new HashMap<Integer, Double>();
-			
-			if (gpuFlag) { // do gpu count
-				if (schemaMap.containsKey(word)) {
-					Map<Integer, Double> valueMap = schemaMap.get(word);
-						// update the counter
-					for (Map.Entry<Integer, Double> entry : valueMap.entrySet()) {
-						int k = entry.getKey();
-						double v = weight;
-						nzw[topic][k] += v;
-						nz[topic] += v;
-						gpuInfo.put(k, v);
-					} // end loop for similar words
-			//		valueMap.clear();
-				} else { // schemaMap don't contain the word
-
-						// the word doesn't have similar words, the infoMap is empty
-						// we do nothing
-					}
-				} else { // the gpuFlag is False
-					// it means we don't do gpu, so the gouInfo map is empty
-				}
-		//		wordGPUInfo.get(docID).get(index).clear();
-				wordGPUInfo.get(docID).set(index, gpuInfo); // we update the gpuinfo
-														// map
-		} else { // we do subtraction according to last iteration information
-				Map<Integer, Double> gpuInfo = wordGPUInfo.get(docID).get(index);
-				// boolean gpuFlag = wordGPUFlag.get(docID).get(t);
-				if (gpuInfo.size() > 0) {
-					for (int similarWordID : gpuInfo.keySet()) {
-						// double v = gpuInfo.get(similarWordID);
-						double v = weight;
-						nzw[topic][similarWordID] -= v;
-						nz[topic] -= v;
-						// if(Double.compare(0, nzw[topic][wordID]) > 0){
-						// System.out.println( nzw[topic][wordID]);
-						// }
-					}
-				}
-			}
-		}
-	
-
 	public void ratioCount(Integer topic, Integer docID, int word, int index, int flag) {
 		nzw[topic][word] += flag;
 		nz[topic] += flag;
@@ -407,12 +295,11 @@ public class PDMM {
 					} // end loop for similar words
 			//		valueMap.clear();
 				} else { // schemaMap don't contain the word
-
-						// the word doesn't have similar words, the infoMap is empty
-						// we do nothing
+					// the word doesn't have similar words, the infoMap is empty
+					// we do nothing
 					}
 				} else { // the gpuFlag is False
-					// it means we don't do gpu, so the gouInfo map is empty
+					// it means we don't use gpu, so the gouInfo map is empty
 				}
 		//		wordGPUInfo.get(docID).get(index).clear();
 				wordGPUInfo.get(docID).set(index, gpuInfo); // we update the gpuinfo
@@ -789,9 +676,12 @@ public class PDMM {
 				mediateSamples = mediateSampleMap.get(s);
 				
 				for (int w = 0; w < num_word; w++){
-			//		normalCountWord(assignmentListMap.get(s)[w], termIDArray[w], -1);
-			//		ratioCountNofilter(assignmentListMap.get(s)[w], s, termIDArray[w], w, -1);
-					ratioCount(assignmentListMap.get(s)[w], s, termIDArray[w], w, -1);
+					if (use_gpu){
+						ratioCount(assignmentListMap.get(s)[w], s, termIDArray[w], w, -1);
+						}
+					else{
+						normalCountWord(assignmentListMap.get(s)[w], termIDArray[w], -1);
+					}
 				}
 				
 				topicSettingArray = enumerateTopicSetting(
@@ -826,16 +716,22 @@ public class PDMM {
 						}
 						// update
 						mediateSamples[round][w] = newTopic;
-					//	normalCountWord(newTopic, wordID, +1);
-					//	ratioCountNofilter(newTopic, s, wordID, w, +1);
-						ratioCount(newTopic, s, wordID, w, +1);
+						if (use_gpu){
+							ratioCount(newTopic, s, wordID, w, +1);
+						}
+						else{
+							normalCountWord(newTopic, wordID, +1);
+						}
 					}
 					
 					for (int w = 0; w < num_word; w++){
 						int wordID = termIDArray[w];
-					//	normalCountWord(mediateSamples[round][w], wordID, -1);
-					//	ratioCountNofilter(mediateSamples[round][w], s, wordID, w, -1);
-						ratioCount(mediateSamples[round][w], s, wordID, w, -1);
+						if (use_gpu){
+							ratioCount(mediateSamples[round][w], s, wordID, w, -1);
+						}
+						else{
+							normalCountWord(mediateSamples[round][w], wordID, -1);
+						}
 					}
 				}
 				
@@ -905,9 +801,12 @@ public class PDMM {
 						mediateSamples[new_index], 0, 
 						assignmentListMap.get(s), 0, mediateSamples[new_index].length);
 				for(int w = 0; w < termIDArray.length; w++){
-				//	normalCountWord(mediateSamples[new_index][w], termIDArray[w], +1);
-				//	ratioCountNofilter(mediateSamples[new_index][w], s, termIDArray[w], w, +1);
-					ratioCount(mediateSamples[new_index][w], s, termIDArray[w], w, +1);
+					if (use_gpu){
+						ratioCount(mediateSamples[new_index][w], s, termIDArray[w], w, +1);
+					}
+					else{
+						normalCountWord(mediateSamples[new_index][w], termIDArray[w], +1);
+					}
 				}
 			}
 			long _e = getCurrTime();
@@ -918,7 +817,8 @@ public class PDMM {
 	
 	private static int[][] enumerateTopicSetting(int[][] topicSettingArray,
 			int[] topKTopics, int maxTd) {
-		// TODO Auto-generated method stub
+		// enumerate all the possible topic setting
+		// we assume the maxTd is up to 4 (if maxTd is bigger then 4, you should apply your function
 		int index = 0;
 		if ( maxTd > 0)
 			index = enumerateOneTopicSetting(topicSettingArray, topKTopics, index);
@@ -1242,8 +1142,7 @@ public class PDMM {
 		double weight = 0.1;
 		double threshold = 0.7;
 		int filterSize = 40; //note here, we make a mistake in the paper writing, we use filtersize=20 for Snippet but 40 for BaiduQA
-		//params of Poisson distribution
-	//	int[] ls = {0,2,3,4,6,8,9,10};
+		boolean use_gpu = True //use GPU-PDMM or PDMM
 		
 		for (int round = 1; round <= 5;round += 1) {
 	//	for (int l:ls){
@@ -1251,13 +1150,14 @@ public class PDMM {
 			for (int num_topic = 40; num_topic <= 40; num_topic += 20) {
 				//int num_topic = 40;
 				double alpha = 1.0 * 50 / num_topic;
-				//double namda = (double)1.0+l/(double)10.0;
+				// params
 				double nambda = 1.5;
 				int maxTd = 2;
 				int Topk = 10;
 				
 				PDMM gsdmm = 
 					new PDMM(doc_list, num_topic, numIter, save_step, beta, alpha, namda, threshold);
+				gsdmm.use_gpu = use_gpu;
 				gsdmm.word2idFileName = "f:/qa_word2id.txt";
 				gsdmm.topWords = 100;
 				gsdmm.maxTd = maxTd;
