@@ -656,7 +656,7 @@ public class PDMM {
 		for (int iteration = 1; iteration <= numIter; iteration++) {
 			System.out.println(iteration + "th iteration begin");
 			if((iteration%saveStep)==0){
-				saveModel(flag+"_iter"+iteration+"_PDMMheu");
+				saveModel(flag+"_iter"+iteration+"_PDMM");
 			}
 			
 			long _s = getCurrTime();
