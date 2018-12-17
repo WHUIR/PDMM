@@ -1141,20 +1141,18 @@ public class PDMM {
 		String similarityFileName = "dataset//qa_w2v.txt";
 		double weight = 0.1;
 		double threshold = 0.7;
-		int filterSize = 40; //note here, we make a mistake in the paper writing, we use filtersize=20 for Snippet but 40 for BaiduQA
+		int filterSize = 40; //we use filtersize=20 for Snippet but 40 for BaiduQA, it's a mistake we make in paper writing!
 		boolean use_gpu = True //use GPU-PDMM or PDMM
+		double nambda = 1.5;
+		int maxTd = 2;
+		int Topk = 10;
 		
+		// change the loop to fit your own need
 		for (int round = 1; round <= 5;round += 1) {
-	//	for (int l:ls){
 	//	for (int maxTd = 1; maxTd <= 4; maxTd +=1){
-			for (int num_topic = 40; num_topic <= 40; num_topic += 20) {
+			for (int num_topic = 40; num_topic <= 80; num_topic += 20) {
 				//int num_topic = 40;
 				double alpha = 1.0 * 50 / num_topic;
-				// params
-				double nambda = 1.5;
-				int maxTd = 2;
-				int Topk = 10;
-				
 				PDMM gsdmm = 
 					new PDMM(doc_list, num_topic, numIter, save_step, beta, alpha, namda, threshold);
 				gsdmm.use_gpu = use_gpu;
@@ -1163,10 +1161,7 @@ public class PDMM {
 				gsdmm.maxTd = maxTd;
 				gsdmm.searchTopK = Topk; // search size for heuristic search , 
 				                          //we don't use heuristic search if we set searchTopK = numTopic
-			//	int round = 1;
-			//	double weight = w/(double)10;
 				
-				//here
 				gsdmm.filterSize = filterSize;
 				gsdmm.roundIndex = round;
 				gsdmm.similarityFileName = similarityFileName;
