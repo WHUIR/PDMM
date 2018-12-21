@@ -1140,7 +1140,7 @@ public class PDMM {
 				gsdmm.weight = weight;
 				gsdmm.initNewModel();
 				gsdmm.init_GSDMM();
-				String flag = round+"round_"+num_topic + "topic_qa_";
+				String flag = round+"round_"+num_topic + "topic_snippet_";
 				flag = "result//"+flag;
 				
 				gsdmm.run_iteration(flag); 
