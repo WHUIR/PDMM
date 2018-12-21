@@ -1,5 +1,3 @@
-package PDMM;
-
 /**
  * 
  */
@@ -15,36 +13,35 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.Set;
 
-import javax.jws.soap.SOAPBinding.Use;
 import java.util.Map.Entry;
 
 public class PDMM {
 	
 	public Set<String> wordSet;
 	public int numTopic;
-	public double alpha, beta, namda;
+	public double alpha, beta;
+	public double namda; // the parameter of Poisson distribution
 	public int numIter;
 	public int saveStep;
 	public ArrayList<Document> docList;
 	public int roundIndex;
 	private Random rg;
-	public double threshold;
-	public double weight;
+	public double threshold; // the similar threshold for constructing similar word set
+	public double weight; //the promotion of similar word
 	public int topWords;
-	public int filterSize;
+	public int filterSize; // the filter size for filtering similar word set
 	public String word2idFileName;
 	public String similarityFileName;
-	public boolean use_gpu;
+	public boolean use_gpu; //true for GPU-PDMM, false for PDMM
 
 	public Map<String, Integer> word2id;
 	public Map<Integer, String> id2word;
 	public Map<Integer, Double> wordIDFMap;
 	
-	public Map<Integer, Set<Integer>> ZdMap;
+	public Map<Integer, Set<Integer>> ZdMap; 
 	public int[] TdArray;
 	
 	public Map<Integer, Map<Integer, Double>> docUsefulWords;
@@ -69,7 +66,7 @@ public class PDMM {
 	
 	private int[] Ck; // Ck[topic]
 	private int CkSum;
-	public int searchTopK;
+	public int searchTopK; // search size for heuristic search , 
 	
 	private Map<Integer, Map<Integer, Double>> schemaMap;
 	
@@ -94,6 +91,7 @@ public class PDMM {
 			String line;
 			
 			//construct word2id map
+			//the format of one line of word2id: "apple,0'
 			while ((line = reader.readLine()) != null) {
 				line = line.trim();
 				String[] items = line.split(",");
@@ -150,12 +148,17 @@ public class PDMM {
 				tmpMap = new HashMap<Integer, Double>();
 				double v = 0;
 				for (int j = 0; j < word_size; j++) {
+					// we need to calculate the similar word set for each word i
+					// so we utilize the i-th row of similarity matrix 
+					// so [j][i] is used below
 					v = schema[j][i];
 					if (Double.compare(v, threshold) > 0) {
+						// whether the word belongs to similar word
 						tmpMap.put(j, v);
 					}
 				}
 				if (tmpMap.size() > filterSize) {
+					// large similar word set means that the word is general, so discard it
 					tmpMap.clear();
 				}
 				tmpMap.remove(i);
@@ -221,6 +224,7 @@ public class PDMM {
 	public void updateWordGPUFlag(int docID, int word, int index, int newTopic) {
 		// we calculate the p(t|w) and p_max(t|w) and use the ratio to decide we
 		// use gpu for the word under this topic or not
+		// see word filtering part in our paper
 		double maxProbability = findTopicMaxProbabilityGivenWord(word);
 		double ratio = getTopicProbabilityGivenWord(newTopic, word) / maxProbability;
 		double a = rg.nextDouble();
@@ -234,7 +238,8 @@ public class PDMM {
 	}
 
 	/**
-	 * 
+	 * load initial status from extra file if you need it
+	 * we don't use that, random initialization is used in our experiment setting
 	 * @param filename for topic assignment for each document
 	 */
 	public void loadInitialStatus(String filename) {
@@ -288,7 +293,7 @@ public class PDMM {
 						// update the counter
 					for (Map.Entry<Integer, Double> entry : valueMap.entrySet()) {
 						int k = entry.getKey();
-						double v = weight;
+						double v = weight; // the promotion of similar word
 						nzw[topic][k] += v;
 						nz[topic] += v;
 						gpuInfo.put(k, v);
@@ -301,31 +306,27 @@ public class PDMM {
 				} else { // the gpuFlag is False
 					// it means we don't use gpu, so the gouInfo map is empty
 				}
-		//		wordGPUInfo.get(docID).get(index).clear();
 				wordGPUInfo.get(docID).set(index, gpuInfo); // we update the gpuinfo
 														// map
 		} else { // we do subtraction according to last iteration information
 				Map<Integer, Double> gpuInfo = wordGPUInfo.get(docID).get(index);
-				// boolean gpuFlag = wordGPUFlag.get(docID).get(t);
 				if (gpuInfo.size() > 0) {
 					for (int similarWordID : gpuInfo.keySet()) {
-						// double v = gpuInfo.get(similarWordID);
 						double v = weight;
 						nzw[topic][similarWordID] -= v;
 						nz[topic] -= v;
-						// if(Double.compare(0, nzw[topic][wordID]) > 0){
-						// System.out.println( nzw[topic][wordID]);
-						// }
 					}
 				}
 			}
 		}
 
-
+	
+	// below functions are used for updating the counter for Gibbs sampling
 	public void normalCountWord(Integer topic, int word, Integer flag) {
 		nzw[topic][word] += flag;
 		nz[topic] += flag;
 	}
+	
 
 	public void normalCountZd(Set<Integer> Zd, Integer flag){
 		for (int topic : Zd){
@@ -352,13 +353,11 @@ public class PDMM {
 		Map<Integer, Map<Integer, Integer>> Ndkt = new HashMap<Integer,Map<Integer, Integer>>();
 		for(int k : ZdList){
 			Ndkt.put(k, new HashMap<Integer, Integer>());
-	//		System.out.println(ZdList.length);
 		}
 		int[] termIDArray = docToWordIDListMap.get(docID);
 		for(int i = 0, length = termIDArray.length; i < length; i++){
 			int word = termIDArray[i];
 			int topic = assignment[i];
-		//	System.out.println(topic);
 			if (Ndkt.get(topic).containsKey(word)){
 				Ndkt.get(topic).put(word, Ndkt.get(topic).get(word)+1);
 			}
@@ -374,13 +373,11 @@ public class PDMM {
 		 Map<Integer, Integer> Ndk = new HashMap<Integer,Integer>();
 		for(int k : ZdList){
 			Ndk.put(k,0);
-	//		System.out.println(ZdList.length);
 		}
 		int[] termIDArray = docToWordIDListMap.get(docID);
 		for(int i = 0, length = termIDArray.length; i < length; i++){
 			int word = termIDArray[i];
 			int topic = assignment[i];
-		//	System.out.println(topic);
 			Ndk.put(topic, Ndk.get(topic)+1);
 		}
 		return Ndk;
@@ -442,6 +439,8 @@ public class PDMM {
 		CkSum = 0;
 	}
 	
+	
+	// initialize the model
 	public void init_GSDMM() {
 		schemaMap = loadSchema(similarityFileName, threshold);
 
@@ -470,6 +469,8 @@ public class PDMM {
 			assert(td>=1);
 			TdArray[d] = td;
 			
+			//randomly initialize
+			
 			Set<Integer> Zd = new HashSet<Integer>();
 			while ( Zd.size() != td ){
 				int u_z = rg.nextInt(numTopic);
@@ -496,6 +497,7 @@ public class PDMM {
 		return System.currentTimeMillis();
 	}
 	
+	// search space pruning strategy, see the paper
 	public int[][] get_top10k(){
 		int[][] TopK = new int[numDoc][10];
 		Map<Integer, Double> Pdz = null;
@@ -508,7 +510,6 @@ public class PDMM {
 			ArrayList<Entry<Integer, Double>> l = new ArrayList<Entry<Integer, Double>>(Pdz.entrySet());
 			Collections.sort(l, new Comparator<Map.Entry<Integer, Double>>() {
 				public int compare(Map.Entry<Integer, Double> o1, Map.Entry<Integer, Double> o2){
-//					return (int)((o2.getValue() - o1.getValue())*100000000000000000.0);
 					return -Double.compare(o1.getValue(), o2.getValue());
 				}
 			});
@@ -528,33 +529,6 @@ public class PDMM {
 		}
 		
 		return value;
-	}
-	
-	private static int[][] ZdSearchSize(int maxTd, int searchTopK){
-		int count = 0;
-		int[] boundary = new int[maxTd];
-		for ( int i = 0; i < maxTd; i++ ){
-			int temp = 1;
-			int factorial = factorial(i+1);
-			for ( int j = 0; j < i+1; j++ ){
-				temp *= (searchTopK - j);
-			}
-			
-			count += temp/factorial;
-			boundary[i] = count;
-		}
-		
-		int[][] array = new int[count][];
-		for ( int i = 0; i < count; i++ ){
-			for ( int j = 0; j < boundary.length; j++ ){
-				if ( i < boundary[j] ){
-					array[i] = new int[j+1];
-					break;
-				}
-			}
-		}
-		
-		return array;
 	}
 	
 	private int[][] ZdSearchSize(){
@@ -583,7 +557,9 @@ public class PDMM {
 		
 		return array;
 	}
+	
 
+	// for searching space
 	public int[][] getTopKTopics(int[][] docTopKTopics){
 		Set<Integer> topKTopics = new HashSet<Integer>();
 		int minIndex = -1;
@@ -634,9 +610,7 @@ public class PDMM {
 	}
 
 	public void run_iteration(String flag) {
-		/* Create a new memory block like two dimensional array is very 
-		 * expensive in Java. We need to reuse the memory block instead of
-		 * creating a new one every time*/
+		
 		int[][] topicSettingArray = ZdSearchSize();
 		int[][] docTopKTopics = new int[numDoc][searchTopK];
 		double[] Ptd_Zd = new double[topicSettingArray.length];
@@ -656,12 +630,11 @@ public class PDMM {
 		for (int iteration = 1; iteration <= numIter; iteration++) {
 			System.out.println(iteration + "th iteration begin");
 			if((iteration%saveStep)==0){
-				saveModel(flag+"_iter"+iteration+"_PDMM");
+				saveModel(flag+"_iter"+iteration);
 			}
 			
 			long _s = getCurrTime();
 			
-	//		if don't use heu strategy,please don't Use below three code line
 			compute_phi();
 			compute_pz();
 			compute_pzd();
@@ -677,9 +650,11 @@ public class PDMM {
 				
 				for (int w = 0; w < num_word; w++){
 					if (use_gpu){
+						// use GPU-PDMM
 						ratioCount(assignmentListMap.get(s)[w], s, termIDArray[w], w, -1);
 						}
 					else{
+						// use PDMM
 						normalCountWord(assignmentListMap.get(s)[w], termIDArray[w], -1);
 					}
 				}
@@ -692,12 +667,12 @@ public class PDMM {
 					int[] topicSetting = topicSettingArray[round];
 					int length_topicSetting = topicSetting.length;
 					
+					//Gibbs Sampling
 					for (int w = 0; w < num_word; w++){
 						int wordID = termIDArray[w];
 						double[] pzDist = new double[length_topicSetting];
 						for (int index = 0; index < length_topicSetting; index++) {
 							int topic = (int) topicSetting[index];
-					//		System.out.println(nzw[topic][wordID]);
 							double pz = 1.0 * (nzw[topic][wordID] + beta) / (nz[topic] + vocSize * beta);
 							pzDist[index] = pz;
 						}
@@ -759,7 +734,6 @@ public class PDMM {
 					for(int k: topicSetting){
 						Set<Integer> dk = 
 							getdk_Zd(s, mediateSamples[round], k);
-					//	System.out.println(dk);
 						for(int t: dk){
 							for (int i = 0; i < Ndkt.get(k).get(t); i++){
 								p31 *= (beta+nzw[k][t]+Ndkt.get(k).get(t)-i);
@@ -781,6 +755,7 @@ public class PDMM {
 					Ptd_Zd[i]+=Ptd_Zd[i-1];
 				}
 				
+				// sample
 				double u_ptdzd = rg.nextDouble()*Ptd_Zd[length_topicSettingArray-1];
 				int new_index = -1;
 				for (int i = 0; i < length_topicSettingArray; i++) {
@@ -911,7 +886,6 @@ public class PDMM {
 	}
 
 	private Boolean saveAssign(String filename) {
-		// TODO 自动生成的方法存根
 		try {
 			PrintWriter out = new PrintWriter(filename);
 			for (int i = 0; i < numDoc; i++) {
@@ -933,7 +907,6 @@ public class PDMM {
 	}
 	
 	private Boolean saveTermAssign(String filename) {
-		// TODO 自动生成的方法存根
 		try {
 			PrintWriter out = new PrintWriter(filename);
 			for (int i = 0; i < numDoc; i++) {
@@ -1074,7 +1047,6 @@ public class PDMM {
 	}
 
 	public boolean saveModelPz(String filename) {
-		// return false;
 		try {
 			PrintWriter out = new PrintWriter(filename);
 
@@ -1134,20 +1106,20 @@ public class PDMM {
 
 	public static void main(String[] args) {
 		
-		ArrayList<Document> doc_list = Document.LoadCorpus("dataset//qa_data.txt");
+		ArrayList<Document> doc_list = Document.LoadCorpus("dataset//Snippet//snippet_data.txt");
 		//params here, please refer to our paper
-		int numIter = 200, save_step = 200;
+		int numIter = 1000, save_step = 200;
 		double beta = 0.1;
-		String similarityFileName = "dataset//qa_w2v.txt";
-		double weight = 0.1;
-		double threshold = 0.7;
-		int filterSize = 40; //we use filtersize=20 for Snippet but 40 for BaiduQA, it's a mistake we make in paper writing!
-		boolean use_gpu = True //use GPU-PDMM or PDMM
-		double nambda = 1.5;
+		String similarityFileName = "dataset//Snippet//snippet_word_similarity.txt";
+		double weight = 0.3; // 0.1 for BaiduQA, 0.3 for Snippet
+		double threshold = 0.5; // 0.7 for BaiduQA, 0.5 for Snippet
+		int filterSize = 20; //notice we use filtersize=20 for Snippet but 40 for BaiduQA, it's a mistake we make in paper writing!
+		boolean use_gpu = true; //use GPU-PDMM or PDMM
+		double namda = 1.5;
 		int maxTd = 2;
 		int Topk = 10;
 		
-		// change the loop to fit your own need
+		// you can change the loop to fit your own experiment need
 		for (int round = 1; round <= 5;round += 1) {
 	//	for (int maxTd = 1; maxTd <= 4; maxTd +=1){
 			for (int num_topic = 40; num_topic <= 80; num_topic += 20) {
@@ -1156,7 +1128,7 @@ public class PDMM {
 				PDMM gsdmm = 
 					new PDMM(doc_list, num_topic, numIter, save_step, beta, alpha, namda, threshold);
 				gsdmm.use_gpu = use_gpu;
-				gsdmm.word2idFileName = "f:/qa_word2id.txt";
+				gsdmm.word2idFileName = "dataset//Snippet//snippet_word2id.txt";
 				gsdmm.topWords = 100;
 				gsdmm.maxTd = maxTd;
 				gsdmm.searchTopK = Topk; // search size for heuristic search , 
@@ -1169,10 +1141,9 @@ public class PDMM {
 				gsdmm.initNewModel();
 				gsdmm.init_GSDMM();
 				String flag = round+"round_"+num_topic + "topic_qa_";
-				flag = "PDMM/qa/" + flag;
+				flag = "result//"+flag;
 				
-				//now GPU is yes , word-filter is yes , heu is yes 
-				gsdmm.run_iteration(flag); //remember to check whether GPU and word-filter is used!!
+				gsdmm.run_iteration(flag); 
 				try {
 					Thread.sleep(10000);
 				} catch (InterruptedException e) {
